@@ -1,0 +1,71 @@
+// Import all SCSS partials
+@import 'variables';
+@import 'mixins';
+@import 'utilities';
+
+// Base styles
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  position: relative;
+  font-weight: normal;
+}
+
+.btn{
+  background: transparent;
+  border: none;
+  outline: none;
+  cursor: pointer;
+}
+
+body {
+  min-height: 100vh;
+  color: $color-text;
+  background: $gradient-main;
+  transition: color 0.5s, background-color 0.5s;
+  line-height: 1.6;
+  font-family: $font-family-base;
+  font-size: 15px;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  margin: 0;
+  padding: 0;
+}
+
+#app {
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  font-weight: normal;
+  min-height: 100vh;
+}
+
+// Links
+a,
+.green {
+  text-decoration: none;
+  color: $color-primary;
+  transition: 0.4s;
+  
+  @media (hover: hover) {
+    &:hover {
+      background-color: rgba($color-primary, 0.1);
+    }
+  }
+}
+
+// Dark mode support
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-background: #{$color-black};
+    --color-background-soft: #{$color-black-soft};
+    --color-background-mute: #{$color-black-mute};
+    --color-border: #{$color-divider-dark-2};
+    --color-border-hover: #{$color-divider-dark-1};
+    --color-heading: #{$color-text-dark-1};
+    --color-text: #{$color-text-dark-2};
+  }
+}
