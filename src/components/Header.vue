@@ -29,7 +29,7 @@
 
 
       <div class="header-right">
-        <button class="btn">
+        <button class="btn" @click="openSettings">
           <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 24 24">
             <g fill="none">
               <path
@@ -46,6 +46,8 @@
 <script setup>
 import {ref, onMounted} from 'vue'
 
+const emit = defineEmits(['openSettings'])
+
 const isOnline = ref(navigator.onLine)
 
 onMounted(() => {
@@ -57,6 +59,10 @@ onMounted(() => {
     isOnline.value = false
   })
 })
+
+const openSettings = () => {
+  emit('openSettings')
+}
 </script>
 
 <style scoped lang="scss">

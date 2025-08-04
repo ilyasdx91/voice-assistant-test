@@ -31,7 +31,11 @@
 
 
         <div class="robot-txt">
-          <p>✨ Готов помочь! О чём поговорим?</p>
+          <p v-if="!response && !isProcessing">✨ Готов помочь! О чём поговорим?</p>
+          <p v-else-if="isProcessing" class="processing-text">{{ processingMessage }}</p>
+          <div v-else-if="response" class="response-text">
+            <p>{{ response }}</p>
+          </div>
         </div>
 
         <button 
@@ -51,19 +55,286 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
+import axios from 'axios'
 
-const isActive = ref(false)
+// States
+const isRecording = ref(false)
+const isProcessing = ref(false)
+const response = ref('')
+const apiKey = ref(import.meta.env.VITE_OPENAI_API_KEY || '')
+const recognitionLanguage = ref('auto')
+const processingMessage = ref('Обработка аудио...')
+const backendUrl = ref('https://3de1f90db8af.ngrok-free.app/api/assistant/query')
+const voiceResponse = ref(false)
+const ttsVoice = ref('alloy')
+const ttsSpeed = ref(1.0)
 
-const startRecording = () => {
-  isActive.value = true
-  console.log('Начало записи...')
+// Media recording
+let mediaRecorder = null
+let audioChunks = []
+
+// Computed
+const isActive = computed(() => isRecording.value || isProcessing.value)
+
+const startRecording = async () => {
+  if (isRecording.value || isProcessing.value) return
+  
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    mediaRecorder = new MediaRecorder(stream)
+    audioChunks = []
+
+    mediaRecorder.ondataavailable = (event) => {
+      audioChunks.push(event.data)
+    }
+
+    mediaRecorder.onstop = async () => {
+      const audioBlob = new Blob(audioChunks, { type: 'audio/wav' })
+      stream.getTracks().forEach(track => track.stop())
+      await processAudio(audioBlob)
+    }
+
+    mediaRecorder.start()
+    isRecording.value = true
+  } catch (error) {
+    console.error('Ошибка доступа к микрофону:', error)
+    alert('Не удалось получить доступ к микрофону')
+  }
 }
 
 const stopRecording = () => {
-  isActive.value = false
-  console.log('Конец записи...')
+  if (mediaRecorder && isRecording.value) {
+    mediaRecorder.stop()
+    isRecording.value = false
+  }
 }
+
+const processAudio = async (audioBlob) => {
+  if (!apiKey.value) {
+    alert('Введите OpenAI API ключ для распознавания речи')
+    return
+  }
+
+  isProcessing.value = true
+  processingMessage.value = 'Распознавание речи...'
+  response.value = 'Обрабатываю ваш запрос...'
+  
+  try {
+    // Конвертируем голос в текст через OpenAI Whisper
+    const formData = new FormData()
+    formData.append('file', audioBlob, 'audio.wav')
+    formData.append('model', 'whisper-1')
+    
+    // Добавляем язык если не автоопределение
+    if (recognitionLanguage.value !== 'auto') {
+      formData.append('language', recognitionLanguage.value)
+    }
+
+    const transcriptionResponse = await axios.post(
+      'https://api.openai.com/v1/audio/transcriptions',
+      formData,
+      {
+        headers: {
+          'Authorization': `Bearer ${apiKey.value}`,
+          'Content-Type': 'multipart/form-data'
+        }
+      }
+    )
+
+    const transcribedText = transcriptionResponse.data.text
+    console.log('Распознанный текст:', transcribedText)
+    
+    processingMessage.value = 'Отправка на сервер...'
+    
+    // Отправляем текст на ваш бэкенд API
+    await sendToBackend(transcribedText)
+    
+  } catch (error) {
+    console.error('Ошибка распознавания:', error)
+    
+    if (error.response?.status === 429) {
+      response.value = 'Слишком много запросов. Подождите немного и попробуйте снова.'
+    } else if (error.response?.status === 401) {
+      response.value = 'Неверный API ключ OpenAI'
+    } else {
+      response.value = 'Ошибка при распознавании речи: ' + (error.response?.data?.error?.message || error.message)
+    }
+  } finally {
+    isProcessing.value = false
+  }
+}
+
+const sendToBackend = async (text) => {
+  try {
+    if (!backendUrl.value) {
+      response.value = `Распознанный текст: "${text}"\n\n(URL бэкенда не указан)`
+      return
+    }
+    
+    const backendResponse = await axios.post(backendUrl.value, {
+      message: text
+    }, {
+      headers: {
+        'ngrok-skip-browser-warning': 'any',
+        'Content-Type': 'application/json'
+      }
+    })
+    
+    // Показываем ответ от бэкенда
+    const messageText = backendResponse.data.message || backendResponse.data.error || 'Получен ответ от сервера'
+    response.value = messageText
+    
+    console.log('Ответ получен:', messageText)
+    console.log('Статус успеха:', backendResponse.data.success)
+    console.log('Голосовой ответ включен:', voiceResponse.value)
+    console.log('API ключ установлен:', !!apiKey.value)
+    
+    // Озвучиваем ответ если включена функция голосового ответа (независимо от статуса success)
+    if (voiceResponse.value && messageText && apiKey.value) {
+      console.log('Запуск TTS для текста:', messageText)
+      try {
+        await speakText(messageText)
+      } catch (ttsError) {
+        console.error('Ошибка TTS:', ttsError)
+      }
+    } else {
+      if (!voiceResponse.value) console.log('TTS отключен пользователем')
+      if (!messageText) console.log('Нет текста для озвучивания')
+      if (!apiKey.value) console.log('Нет API ключа для TTS')
+    }
+    console.log('Ответ от бэкенда:', backendResponse.data)
+    
+  } catch (error) {
+    console.error('Ошибка отправки на бэкенд:', error)
+    
+    // Показываем распознанный текст даже если бэкенд недоступен
+    response.value = `Распознанный текст: "${text}"\n\n(Не удалось отправить на сервер: ${error.message})`
+  }
+}
+
+// Функция синтеза речи через OpenAI TTS API
+const speakText = async (text) => {
+  console.log('speakText вызван с параметрами:', {
+    text,
+    voiceResponse: voiceResponse.value,
+    apiKey: !!apiKey.value,
+    ttsVoice: ttsVoice.value,
+    ttsSpeed: ttsSpeed.value
+  })
+
+  if (!voiceResponse.value) {
+    console.log('Голосовой ответ выключен')
+    return
+  }
+  
+  if (!text || text.trim() === '') {
+    console.log('Пустой текст для озвучивания')
+    return
+  }
+
+  if (!apiKey.value) {
+    console.error('OpenAI API ключ не указан')
+    return
+  }
+  
+  console.log('Начинаем генерацию речи через OpenAI TTS:', text.substring(0, 50) + '...')
+  
+  try {
+    const ttsResponse = await axios.post(
+      'https://api.openai.com/v1/audio/speech',
+      {
+        model: 'tts-1',
+        input: text.trim(),
+        voice: ttsVoice.value || 'alloy',
+        speed: parseFloat(ttsSpeed.value) || 1.0
+      },
+      {
+        headers: {
+          'Authorization': `Bearer ${apiKey.value}`,
+          'Content-Type': 'application/json'
+        },
+        responseType: 'blob',
+        timeout: 30000 // 30 секунд таймаут
+      }
+    )
+
+    console.log('TTS запрос успешен, размер аудио:', ttsResponse.data.size, 'байт')
+
+    // Создаем аудио объект и воспроизводим
+    const audioBlob = ttsResponse.data
+    const audioUrl = URL.createObjectURL(audioBlob)
+    const audio = new Audio(audioUrl)
+    
+    // Промис для отслеживания воспроизведения
+    return new Promise((resolve, reject) => {
+      audio.oncanplaythrough = () => {
+        console.log('Аудио готово к воспроизведению')
+        audio.play().then(() => {
+          console.log('Воспроизведение началось успешно')
+        }).catch(playError => {
+          console.error('Ошибка при запуске воспроизведения:', playError)
+          reject(playError)
+        })
+      }
+      
+      audio.onplay = () => {
+        console.log('Начало воспроизведения TTS')
+      }
+      
+      audio.onended = () => {
+        console.log('Окончание воспроизведения TTS')
+        URL.revokeObjectURL(audioUrl)
+        resolve()
+      }
+      
+      audio.onerror = (error) => {
+        console.error('Ошибка воспроизведения аудио:', error)
+        URL.revokeObjectURL(audioUrl)
+        reject(error)
+      }
+
+      // Устанавливаем громкость
+      audio.volume = 1.0
+      
+      // Загружаем аудио
+      audio.load()
+    })
+    
+  } catch (error) {
+    console.error('Ошибка OpenAI TTS:', error)
+    
+    if (error.response?.status === 401) {
+      console.error('Неверный OpenAI API ключ')
+    } else if (error.response?.status === 429) {
+      console.error('Превышен лимит запросов OpenAI')
+    } else {
+      console.error('Детали ошибки TTS:', error.response?.data || error.message)
+    }
+    throw error
+  }
+}
+
+// Функция тестирования TTS
+const testTTS = async () => {
+  const testText = recognitionLanguage.value === 'en' ? 
+    'This is a voice test using OpenAI text to speech.' : 
+    'Это тест голоса через OpenAI. Качество речи очень высокое.'
+  
+  console.log('Тестирование OpenAI TTS с текстом:', testText)
+  await speakText(testText)
+}
+
+// Expose functions for parent component
+defineExpose({
+  apiKey,
+  recognitionLanguage,
+  voiceResponse,
+  ttsVoice,
+  ttsSpeed,
+  backendUrl,
+  testTTS
+})
 </script>
 
 <style scoped lang="scss">
@@ -153,32 +424,36 @@ const stopRecording = () => {
           background-color: $color-green-dark;
           animation: pulse-speaker 2s infinite;
           
-          &::before {
-            content: '';
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 100%;
-            height: 100%;
-            border-radius: 50%;
-            border: 2px solid rgba(white, 0.8);
-            background: transparent;
-            transform: translate(-50%, -50%);
-            animation: pulse-ring 2.5s infinite;
+          .pulse-ring {
+            opacity: 1;
+          }
+        }
+        
+        .pulse-ring {
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          width: 100%;
+          height: 100%;
+          border-radius: 50%;
+          border: 1px solid rgba(white, 0.8);
+          background: transparent;
+          transform: translate(-50%, -50%) scale(1);
+          opacity: 0;
+          pointer-events: none;
+          
+          &.ring-1 {
+            animation: pulse-ring-wave 3s infinite;
           }
           
-          &::after {
-            content: '';
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 100%;
-            height: 100%;
-            border-radius: 50%;
-            border: 2px solid rgba(white, 0.6);
-            background: transparent;
-            transform: translate(-50%, -50%);
-            animation: pulse-ring 2.5s infinite 0.8s;
+          &.ring-2 {
+            animation: pulse-ring-wave 3s infinite 0.7s;
+            border-color: rgba(white, 0.6);
+          }
+          
+          &.ring-3 {
+            animation: pulse-ring-wave 3s infinite 1.4s;
+            border-color: rgba(white, 0.4);
           }
         }
         
@@ -195,6 +470,7 @@ const stopRecording = () => {
     .robot-txt{
       margin-top: $space-xl;
       margin-bottom: $space-md;
+      
       p{
         color: rgba(white, 0.9);
         font-size: 1.2rem;
@@ -204,6 +480,23 @@ const stopRecording = () => {
         border-radius: $radius-full;
         backdrop-filter: blur(10px);
         border: 1px solid rgba(white, 0.2);
+        margin: 0;
+      }
+      
+      .processing-text {
+        color: rgba($color-warning, 0.9);
+        animation: pulse-text 1.5s infinite;
+      }
+      
+      .response-text {
+        p {
+          background: rgba($color-success, 0.15);
+          border: 1px solid rgba($color-success, 0.3);
+          color: rgba(white, 0.95);
+          text-align: left;
+          white-space: pre-wrap;
+          line-height: 1.6;
+        }
       }
     }
 
@@ -234,18 +527,27 @@ const stopRecording = () => {
   }
 }
 
-@keyframes pulse-ring {
+@keyframes pulse-ring-wave {
   0% {
-    transform: translate(-50%, -50%) scale(0.8);
-    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0.8;
   }
   50% {
-    transform: translate(-50%, -50%) scale(1.2);
-    opacity: 0.6;
+    transform: translate(-50%, -50%) scale(2);
+    opacity: 0.4;
   }
   100% {
-    transform: translate(-50%, -50%) scale(1.8);
+    transform: translate(-50%, -50%) scale(3.5);
     opacity: 0;
+  }
+}
+
+@keyframes pulse-text {
+  0%, 100% {
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 1;
   }
 }
 
