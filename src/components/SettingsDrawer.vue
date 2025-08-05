@@ -82,24 +82,38 @@
         <div class="api-settings">
           <div class="setting-group">
             <label>OpenAI API ключ:</label>
+            <div v-if="apiKey" class="api-status">
+              ✅ API ключ установлен из переменной окружения
+            </div>
+            <div v-else class="api-warning">
+              ⚠️ API ключ не установлен. Добавьте VITE_OPENAI_API_KEY в .env файл
+            </div>
             <input 
               type="password" 
               v-model="apiKey" 
-              placeholder="Введите OpenAI API ключ"
+              placeholder="Или введите API ключ здесь (временно)"
               class="api-input"
+              :class="{ 'api-input-optional': !!apiKey }"
             >
-            <div v-if="apiKey" class="api-status">
-              ✅ API ключ установлен
-            </div>
           </div>
           
           <div class="setting-group">
             <label>URL бэкенд API:</label>
+            <div v-if="backendUrl && backendUrl.includes('VITE_BACKEND_API_URL')" class="api-status">
+              ✅ Бэкенд URL установлен из переменной окружения
+            </div>
+            <div v-else-if="backendUrl" class="api-status">
+              ✅ URL бэкенда: {{ backendUrl.substring(0, 50) }}...
+            </div>
+            <div v-else class="api-warning">
+              ⚠️ URL бэкенда не установлен
+            </div>
             <input 
               type="text" 
               v-model="backendUrl" 
-              placeholder="https://example.com/api"
+              placeholder="Или введите URL бэкенда здесь"
               class="api-input"
+              :class="{ 'api-input-optional': !!backendUrl }"
             >
           </div>
         </div>
@@ -384,7 +398,7 @@ const testTTS = () => {
 }
 
 .api-status {
-  margin-top: $space-xs;
+  margin-bottom: $space-xs;
   padding: $space-xs $space-sm;
   background: rgba($color-success, 0.1);
   border: 1px solid $color-success;
@@ -392,6 +406,22 @@ const testTTS = () => {
   font-size: 12px;
   color: darken($color-success, 20%);
   @include font-medium;
+}
+
+.api-warning {
+  margin-bottom: $space-xs;
+  padding: $space-xs $space-sm;
+  background: rgba($color-warning, 0.1);
+  border: 1px solid $color-warning;
+  border-radius: $radius-sm;
+  font-size: 12px;
+  color: darken($color-warning, 30%);
+  @include font-medium;
+}
+
+.api-input-optional {
+  opacity: 0.6;
+  font-size: 12px;
 }
 
 .api-settings {

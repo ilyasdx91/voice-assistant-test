@@ -43,11 +43,11 @@ const isSettingsOpen = ref(false)
 // Settings state
 const settings = reactive({
   recognitionLanguage: 'auto',
-  voiceResponse: false,
+  voiceResponse: true,
   ttsVoice: 'alloy',
   ttsSpeed: 1.0,
   apiKey: import.meta.env.VITE_OPENAI_API_KEY || '',
-  backendUrl: 'https://3de1f90db8af.ngrok-free.app/api/assistant/query'
+  backendUrl: import.meta.env.VITE_BACKEND_API_URL || 'https://7f200c12015b.ngrok-free.app/api/Assistant/query'
 })
 
 // Watch settings and sync with VoiceAssistant
