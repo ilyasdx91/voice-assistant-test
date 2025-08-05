@@ -71,13 +71,13 @@ const openSettings = () => {
 
 .header {
   background: transparent;
-  //backdrop-filter: blur(10px);
-  //border-bottom: 1px solid rgba($color-primary-light, 0.2);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba($color-primary-light, 0.2);
   position: sticky;
   top: 0;
   z-index: 100;
   color: #fff;
-  padding: 16px 0;
+  padding: 2px 0;
 
   .header-left {
     @include flex-start;
@@ -139,7 +139,7 @@ const openSettings = () => {
   max-width: 1200px;
   margin: 0 auto;
   padding: 0 $space-lg;
-  height: 70px;
+  //height: 70px;
   @include flex-between;
 }
 

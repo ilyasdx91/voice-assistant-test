@@ -1,5 +1,8 @@
 <template>
   <div id="app">
+    <!-- Animated Background -->
+    <AnimatedBackground />
+    
     <!-- Header Component -->
     <Header @openSettings="openSettings" />
     
@@ -32,6 +35,7 @@
 
 <script setup>
 import { ref, reactive, watch } from 'vue'
+import AnimatedBackground from './components/AnimatedBackground.vue'
 import Header from './components/Header.vue'
 import VoiceAssistant from './components/VoiceAssistant.vue'
 import SettingsDrawer from './components/SettingsDrawer.vue'
