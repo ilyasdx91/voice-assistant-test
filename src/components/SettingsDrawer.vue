@@ -35,7 +35,7 @@
               class="voice-checkbox"
             >
             <span class="checkmark">🔊</span>
-            Голосовой ответ (OpenAI TTS)
+            <span class="label-text">Голосовой ответ (OpenAI TTS)</span>
           </label>
           <button 
             @click="testTTS" 
@@ -65,15 +65,18 @@
             <input 
               type="range" 
               v-model="ttsSpeed" 
-              min="0.25" 
-              max="4.0" 
-              step="0.25"
+              min="0.5" 
+              max="3.0" 
+              step="0.5"
               class="speed-slider"
             >
             <div class="speed-labels">
-              <span>0.25x</span>
+              <span>0.5x</span>
               <span>1x</span>
-              <span>4x</span>
+              <span>1.5x</span>
+              <span>2x</span>
+              <span>2.5x</span>
+              <span>3x</span>
             </div>
           </div>
         </div>
@@ -118,9 +121,9 @@
           </div>
         </div>
         
-        <div class="rate-limit-info">
-          ℹ️ Голос → Текст → Отправка на ваш бэкенд API
-        </div>
+<!--        <div class="rate-limit-info">-->
+<!--          ℹ️ Голос → Текст → Отправка на ваш бэкенд API-->
+<!--        </div>-->
       </div>
     </div>
   </div>
@@ -249,7 +252,7 @@ const testTTS = () => {
   @include flex-between;
   padding: $space-lg;
   border-bottom: 1px solid rgba($color-border, 0.3);
-  background: $gradient-primary;
+  background: $gradient-main;
   color: white;
   
   h3 {
@@ -291,25 +294,30 @@ const testTTS = () => {
 }
 
 .checkbox-label {
-  @include flex-start;
+  display: inline-flex;
+  align-items: center;
   cursor: pointer;
   @include font-semibold;
-  gap: $space-sm;
+  gap: $space-xs;
   
   input[type="checkbox"] {
-    width: 18px;
-    height: 18px;
+    width: 16px;
+    height: 16px;
     margin: 0;
     cursor: pointer;
   }
   
   .checkmark {
-    font-size: 16px;
+    font-size: 14px;
+    line-height: 1;
+  }
+  
+  .label-text {
+    white-space: nowrap;
   }
 }
 
-.api-input,
-.language-select {
+.api-input {
   width: 100%;
   padding: $space-sm $space-md;
   border: 2px solid rgba($color-primary-light, 0.3);
@@ -323,6 +331,32 @@ const testTTS = () => {
     outline: none;
     border-color: $color-primary;
     box-shadow: 0 0 0 3px rgba($color-primary, 0.1);
+  }
+}
+
+.language-select {
+  width: 100%;
+  padding: $space-sm $space-md;
+  padding-right: 40px;
+  border: 2px solid rgba($color-primary-light, 0.3);
+  border-radius: $radius-md;
+  font-size: 14px;
+  color: $color-text-dark;
+  background: white url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='%23666' viewBox='0 0 24 24'%3e%3cpath d='m7 10 5 5 5-5z'/%3e%3c/svg%3e") no-repeat right 12px center;
+  background-size: 20px;
+  appearance: none;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  
+  &:focus {
+    outline: none;
+    border-color: $color-primary;
+    box-shadow: 0 0 0 3px rgba($color-primary, 0.1);
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='%23409eff' viewBox='0 0 24 24'%3e%3cpath d='m7 10 5 5 5-5z'/%3e%3c/svg%3e");
+  }
+  
+  &:hover {
+    border-color: rgba($color-primary, 0.5);
   }
 }
 
@@ -391,10 +425,24 @@ const testTTS = () => {
 }
 
 .speed-labels {
-  @include flex-between;
-  font-size: 12px;
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
   color: $color-text-muted;
   margin-top: $space-xs;
+  
+  span {
+    flex: 1;
+    text-align: center;
+    
+    &:first-child {
+      text-align: left;
+    }
+    
+    &:last-child {
+      text-align: right;
+    }
+  }
 }
 
 .api-status {

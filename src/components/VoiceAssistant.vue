@@ -38,8 +38,9 @@
           </div>
         </div>
 
-        <button 
+        <button
           class="btn btn-voice"
+          :class="{ 'recording': isRecording }"
           @mousedown="startRecording"
           @mouseup="stopRecording"
           @touchstart.prevent="startRecording"
@@ -57,7 +58,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import axios from 'axios'
 
 // States
@@ -70,7 +71,7 @@ const processingMessage = ref('Обработка аудио...')
 const backendUrl = ref(import.meta.env.VITE_BACKEND_API_URL || 'https://7f200c12015b.ngrok-free.app/api/Assistant/query')
 const voiceResponse = ref(true)
 const ttsVoice = ref('alloy')
-const ttsSpeed = ref(1.0)
+const ttsSpeed = ref(1)
 
 // Media recording
 let mediaRecorder = null
@@ -108,16 +109,20 @@ const startRecording = async () => {
 const stopRecording = () => {
   if (mediaRecorder && isRecording.value) {
     mediaRecorder.stop()
-    isRecording.value = false
+    // НЕ сбрасываем isRecording здесь - это сделается в processAudio
   }
 }
 
 const processAudio = async (audioBlob) => {
   if (!apiKey.value) {
+    // Сбрасываем состояние записи если нет API ключа
+    isRecording.value = false
     alert('Введите OpenAI API ключ для распознавания речи')
     return
   }
 
+  // Сначала сбрасываем запись, потом включаем обработку
+  isRecording.value = false
   isProcessing.value = true
   processingMessage.value = 'Распознавание речи...'
   response.value = ''
@@ -333,6 +338,22 @@ const testTTS = async () => {
   await speakText(testText)
 }
 
+// Предзагрузка изображений робота
+const preloadImages = () => {
+  const img1 = new Image()
+  const img2 = new Image()
+  
+  img1.src = new URL('@/assets/voice-assistant-1.png', import.meta.url).href
+  img2.src = new URL('@/assets/voice-assistant-2.png', import.meta.url).href
+  
+  console.log('Предзагружены изображения робота для плавной анимации')
+}
+
+// Инициализация компонента
+onMounted(() => {
+  preloadImages()
+})
+
 // Expose functions for parent component
 defineExpose({
   apiKey,
@@ -351,10 +372,23 @@ defineExpose({
 
 .voice-assistant {
   flex: 1;
-  padding: $space-2xl 0;
+  padding: $space-md 0;
   min-height: calc(100vh - 70px);
   @include flex-center;
   flex-direction: column;
+
+  // Предзагрузка изображений через CSS
+  &::before {
+    content: '';
+    position: absolute;
+    width: 0;
+    height: 0;
+    overflow: hidden;
+    z-index: -1;
+    background-image: 
+      url('@/assets/voice-assistant-1.png'),
+      url('@/assets/voice-assistant-2.png');
+  }
 
   .assistant-main{
     color: #fff;
@@ -382,7 +416,7 @@ defineExpose({
     }
 
     .robot{
-      max-width: 200px;
+      max-width: 170px;
       margin: auto;
       position: relative;
       
@@ -391,6 +425,7 @@ defineExpose({
         height: auto;
         transition: all 1.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
         transform-origin: center;
+        animation: gentle-sway 4s ease-in-out infinite;
       }
       
       .robot-1{
@@ -421,7 +456,7 @@ defineExpose({
         width: 30px;
         height: 30px;
         position: absolute;
-        top: 30px;
+        top: 60px;
         right: 0;
         padding: 5px;
         border-radius: 50%;
@@ -483,12 +518,12 @@ defineExpose({
     }
     
     .robot-txt{
-      margin-top: $space-xl;
+      margin-top: $space-md;
       margin-bottom: $space-md;
       
       p{
         color: rgba(white, 0.9);
-        font-size: 1.2rem;
+        font-size: 1rem;
         @include font-medium;
         padding: $space-md $space-lg;
         background: rgba(white, 0.1);
@@ -526,6 +561,8 @@ defineExpose({
       border-radius: $radius-full;
       width: 80px;
       height: 80px;
+      transition: all 0.3s ease;
+      transform: scale(1);
       
       // Отключаем выделение текста и контекстное меню на iOS
       -webkit-user-select: none;
@@ -534,6 +571,19 @@ defineExpose({
       user-select: none;
       -webkit-touch-callout: none;
       -webkit-tap-highlight-color: transparent;
+      
+      // Эффекты при наведении
+      &:hover {
+        background: radial-gradient(circle,rgba(154, 199, 222, 1) 0%, rgba(113, 194, 234, 1) 17%, rgba(84, 185, 235, 1) 30%, rgba(54, 175, 235, 1) 43%, rgba(36, 164, 228, 1) 53%, rgba(2, 155, 231, 1) 72%, rgba(0, 149, 231, 1) 84%, rgba(0, 124, 196, 1) 100%);
+        transform: scale(1.05);
+        box-shadow: 0 8px 25px rgba(0, 144, 216, 0.3);
+      }
+      
+      // Эффекты при активном состоянии (зажатии)
+      &:active, &.recording {
+        animation: btn-pulse 0.8s infinite;
+        transform: scale(0.95);
+      }
       
       // Предотвращаем появление лупы на iOS
       &:focus {
@@ -582,6 +632,34 @@ defineExpose({
   }
   50% {
     opacity: 1;
+  }
+}
+
+// Анимация покачивания робота
+@keyframes gentle-sway {
+  0%, 100% {
+    transform: rotate(0deg) translateY(0px);
+  }
+  25% {
+    transform: rotate(1deg) translateY(-2px);
+  }
+  50% {
+    transform: rotate(0deg) translateY(-3px);
+  }
+  75% {
+    transform: rotate(-1deg) translateY(-2px);
+  }
+}
+
+// Анимация пульсации кнопки при записи
+@keyframes btn-pulse {
+  0%, 100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(0, 144, 216, 0.5);
+  }
+  50% {
+    transform: scale(1);
+    box-shadow: 0 0 0 15px rgba(0, 144, 216, 0);
   }
 }
 

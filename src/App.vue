@@ -45,7 +45,7 @@ const settings = reactive({
   recognitionLanguage: 'auto',
   voiceResponse: true,
   ttsVoice: 'alloy',
-  ttsSpeed: 1.0,
+  ttsSpeed: 1,
   apiKey: import.meta.env.VITE_OPENAI_API_KEY || '',
   backendUrl: import.meta.env.VITE_BACKEND_API_URL || 'https://7f200c12015b.ngrok-free.app/api/Assistant/query'
 })
