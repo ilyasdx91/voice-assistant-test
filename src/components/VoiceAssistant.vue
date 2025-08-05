@@ -42,8 +42,10 @@
           class="btn btn-voice"
           @mousedown="startRecording"
           @mouseup="stopRecording"
-          @touchstart="startRecording"
+          @touchstart.prevent="startRecording"
           @touchend="stopRecording"
+          @contextmenu.prevent
+          @selectstart.prevent
         >
           <svg width="14" height="19" viewBox="0 0 14 19" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M7.00001 12C6.16668 12 5.45835 11.7083 4.87501 11.125C4.29168 10.5417 4.00001 9.83333 4.00001 9V3C4.00001 2.16667 4.29168 1.45833 4.87501 0.875C5.45835 0.291667 6.16668 0 7.00001 0C7.83335 0 8.54168 0.291667 9.12501 0.875C9.70835 1.45833 10 2.16667 10 3V9C10 9.83333 9.70835 10.5417 9.12501 11.125C8.54168 11.7083 7.83335 12 7.00001 12ZM6.00001 18V15.925C4.46668 15.7083 3.15418 15.0583 2.06251 13.975C0.970847 12.8917 0.308347 11.575 0.0750141 10.025C0.0416808 9.74167 0.116681 9.5 0.300014 9.3C0.483347 9.1 0.716681 9 1.00001 9C1.28335 9 1.52085 9.09583 1.71251 9.2875C1.90418 9.47917 2.03335 9.71667 2.10001 10C2.33335 11.1667 2.91251 12.125 3.83751 12.875C4.76251 13.625 5.81668 14 7.00001 14C8.20001 14 9.25835 13.6208 10.175 12.8625C11.0917 12.1042 11.6667 11.15 11.9 10C11.9667 9.71667 12.0958 9.47917 12.2875 9.2875C12.4792 9.09583 12.7167 9 13 9C13.2833 9 13.5167 9.1 13.7 9.3C13.8833 9.5 13.9583 9.74167 13.925 10.025C13.6917 11.5417 13.0333 12.85 11.95 13.95C10.8667 15.05 9.55001 15.7083 8.00001 15.925V18C8.00001 18.2833 7.90418 18.5208 7.71251 18.7125C7.52085 18.9042 7.28335 19 7.00001 19C6.71668 19 6.47918 18.9042 6.28751 18.7125C6.09585 18.5208 6.00001 18.2833 6.00001 18ZM7.00001 10C7.28335 10 7.52085 9.90417 7.71251 9.7125C7.90418 9.52083 8.00001 9.28333 8.00001 9V3C8.00001 2.71667 7.90418 2.47917 7.71251 2.2875C7.52085 2.09583 7.28335 2 7.00001 2C6.71668 2 6.47918 2.09583 6.28751 2.2875C6.09585 2.47917 6.00001 2.71667 6.00001 3V9C6.00001 9.28333 6.09585 9.52083 6.28751 9.7125C6.47918 9.90417 6.71668 10 7.00001 10Z" fill="#F3F3F3"/>
@@ -118,7 +120,7 @@ const processAudio = async (audioBlob) => {
 
   isProcessing.value = true
   processingMessage.value = 'Распознавание речи...'
-  response.value = 'Обрабатываю ваш запрос...'
+  response.value = ''
   
   try {
     // Конвертируем голос в текст через OpenAI Whisper
@@ -146,6 +148,7 @@ const processAudio = async (audioBlob) => {
     console.log('Распознанный текст:', transcribedText)
     
     processingMessage.value = 'Отправка на сервер...'
+    response.value = `Запрос: "${transcribedText}"`
     
     // Отправляем текст на ваш бэкенд API
     await sendToBackend(transcribedText)
@@ -169,6 +172,7 @@ const sendToBackend = async (text) => {
   try {
     if (!backendUrl.value) {
       response.value = `Распознанный текст: "${text}"\n\n(URL бэкенда не указан)`
+      isProcessing.value = false
       return
     }
     
@@ -183,14 +187,17 @@ const sendToBackend = async (text) => {
     
     // Показываем ответ от бэкенда
     const messageText = backendResponse.data.message || backendResponse.data.error || 'Получен ответ от сервера'
-    response.value = messageText
     
     console.log('Ответ получен:', messageText)
     console.log('Статус успеха:', backendResponse.data.success)
     console.log('Голосовой ответ включен:', voiceResponse.value)
     console.log('API ключ установлен:', !!apiKey.value)
     
-    // Озвучиваем ответ если включена функция голосового ответа (независимо от статуса success)
+    // Сначала останавливаем обработку и показываем текст
+    isProcessing.value = false
+    response.value = messageText
+    
+    // Потом запускаем TTS (независимо от статуса success)
     if (voiceResponse.value && messageText && apiKey.value) {
       console.log('Запуск TTS для текста:', messageText)
       try {
@@ -208,7 +215,8 @@ const sendToBackend = async (text) => {
   } catch (error) {
     console.error('Ошибка отправки на бэкенд:', error)
     
-    // Показываем распознанный текст даже если бэкенд недоступен
+    // Останавливаем обработку и показываем ошибку
+    isProcessing.value = false
     response.value = `Распознанный текст: "${text}"\n\n(Не удалось отправить на сервер: ${error.message})`
   }
 }
@@ -351,6 +359,13 @@ defineExpose({
   .assistant-main{
     color: #fff;
     text-align: center;
+    
+    // Отключаем выделение текста на всей области
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
     
     h1{
       background: linear-gradient(90deg, #1788D8 0%, #71BBF0 50%, #408CFF 100%);
@@ -496,6 +511,12 @@ defineExpose({
           text-align: left;
           white-space: pre-wrap;
           line-height: 1.6;
+          
+          // Разрешаем выделение текста ответа
+          -webkit-user-select: text;
+          -moz-user-select: text;
+          -ms-user-select: text;
+          user-select: text;
         }
       }
     }
@@ -505,6 +526,19 @@ defineExpose({
       border-radius: $radius-full;
       width: 80px;
       height: 80px;
+      
+      // Отключаем выделение текста и контекстное меню на iOS
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+      user-select: none;
+      -webkit-touch-callout: none;
+      -webkit-tap-highlight-color: transparent;
+      
+      // Предотвращаем появление лупы на iOS
+      &:focus {
+        outline: none;
+      }
     }
   }
 }
